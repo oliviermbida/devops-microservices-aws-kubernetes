@@ -1,0 +1,462 @@
+version: 2.1
+
+parameters:
+
+  setup_aws_cloud9:
+    type: boolean
+    default: false
+  commit:
+    type: boolean
+    default: false
+
+commands:
+# Useful if you don't want to re-run deploy-infrastructure which takes a while.
+  check_job:
+    description: Stop job if false  
+    parameters:
+      start_job:
+        type: boolean
+        default: true        
+    steps: 
+      - when:
+          condition: 
+            not: << parameters.start_job >>
+          steps:
+            - run: circleci-agent step halt
+  check_master:
+    description: Stop job if not master branch but continue with other jobs in pipeline          
+    steps:        
+      - run: 
+          name: Check if master 
+          command: |
+            # If condition is true stop this job but continue with others jobs in the pipeline
+            if [ "$CIRCLE_BRANCH" != "master" ]; then
+                circleci-agent step halt
+            fi
+  commit_to_github:
+    description: Commit to github
+    parameters:
+      commit_message:
+        type: string
+        default: "NO_BUILD Auto commit from CircleCI [skip ci]"
+      commit_branch:
+        type: string
+        default: "development"
+      commit:
+        type: boolean
+        default: false 
+    steps: 
+      # - checkout
+      # For a self-hosted runner, ensure that you have an ssh-agent on your system 
+      # to successfully use the add_ssh_keys step. 
+      # The SSH key is written to $HOME/.ssh/id_rsa_<fingerprint>, 
+      # where $HOME is the home directory of the user configured to execute jobs, 
+      # and <fingerprint> is the fingerprint of the key. 
+      # A host entry is also appended to $HOME/.ssh/config, 
+      # along with a relevant IdentityFile option to use the key.
+      - when:
+          condition: 
+              not: <<parameters.commit>>
+          steps:
+            - add_ssh_keys:
+                fingerprints:
+                  - "43:08:ce:f6:6f:04:b8:d2:53:1b:0c:fd:19:8f:2f:cc"
+            - run:
+                name: Commit to GitHub
+                command: |
+                  if [[ -z "${CIRCLE_PULL_REQUEST}" ]]
+                  then
+                    printf "%s" 'github.com ssh-ed25519 43:08:ce:f6:6f:04:b8:d2:53:1b:0c:fd:19:8f:2f:cc' >> "$HOME/.ssh/known_hosts"
+                    if [ "${HOME}" = "/" ]
+                    then
+                      export HOME=$(getent passwd $(id -un) | cut -d: -f6)
+                    fi
+                    export GIT_SSH_COMMAND='ssh -i "$HOME/.ssh/id_ed25519" -o UserKnownHostsFile="$HOME/.ssh/known_hosts"'
+                    echo "Committing to GitHub"
+                    # use git+ssh instead of https
+                    git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
+                    git config --global gc.auto 0 || true
+                    git config user.email $USER_EMAIL
+                    git config user.name $USER_NAME
+                    git checkout <<parameters.commit_branch>>
+                    git pull origin <<parameters.commit_branch>>
+                    git commit --allow-empty -am "<<parameters.commit_message>>"
+                    git push origin <<parameters.commit_branch>>
+                  else
+                    echo "No commit to GitHub"
+                  fi
+# Similar to [skip ci] or [ci skip] in commit message
+  cancel-workflow:
+    description: Cancel workflow given a commit message to stop it being run automatically
+    parameters:
+      workflow_id:
+        type: string
+        default: $CIRCLE_WORKFLOW_ID
+      custom-identifier:
+        type: string
+        default: "NO_BUILD"
+    steps: 
+      - checkout
+      # - run: git submodule sync
+      # - run: git submodule update --init
+      - run:
+          name: Stop automatic builds 
+          command: |
+            commit_message=$(git log -1 HEAD --pretty=format:%s)
+            if [[ $commit_message == *<<parameters.custom-identifier>>* ]]; then
+            echo "<<parameters.custom-identifier>> commit, cancelling workflow <<parameters.workflow_id>>"
+            curl --request POST \
+              --url https://circleci.com/api/v2/workflow/<<parameters.workflow_id>>/cancel \
+              --header "Circle-Token: ${CIRCLE_TOKEN}"
+            fi
+# AWS CLI v2           
+# Could use the Orb circleci/aws-cli@3.1.1
+# Best to know which commands are executed if you are security aware
+# You also reduce the overheads of a generic Orb
+  install_aws:
+    description: Install the AWS CLI via Pip if not already installed.
+    parameters:
+      binary-dir:
+        default: /usr/local/bin
+        description: >
+          The main aws program in the install directory is symbolically linked to
+          the file aws in the specified path. Defaults to /usr/local/bin
+        type: string
+      install-dir:
+        default: /usr/local/aws-cli
+        description: >
+          Specify the installation directory of AWS CLI. Defaults to
+          /usr/local/aws-cli
+        type: string
+    steps:
+      - run:
+          command: |
+            curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64$1.zip" -o "awscliv2.zip"
+            unzip -q -o awscliv2.zip
+            sudo ./aws/install -i "${PARAM_AWS_CLI_INSTALL_DIR}" -b "${PARAM_AWS_CLI_BINARY_DIR}"
+            rm -r awscliv2.zip ./aws
+            aws --version
+          environment:
+            PARAM_AWS_CLI_BINARY_DIR: <<parameters.binary-dir>>
+            PARAM_AWS_CLI_INSTALL_DIR: <<parameters.install-dir>>
+          name: Install AWS CLI v2
+  configure_aws:
+    description: >
+      configure aws credentials
+    parameters:
+      access_key_id: 
+        type: string
+        description: AWS access key Id
+        default: $AWS_USER_ACCESS_KEY_ID
+      secret_access_key: 
+        type: string
+        description: AWS secret access key
+        default: $AWS_USER_SECRET_ACCESS_KEY
+      region: 
+        type: string
+        description: AWS default region
+        default: $AWS_DEFAULT_REGION
+    steps: 
+      - run:
+          name: Configure aws 
+          command: |
+            # AWS CLI supported environment variables
+            AWS_ACCESS_KEY_ID=$(eval echo "$PARAM_AWS_CLI_ACCESS_KEY_ID")
+            AWS_SECRET_ACCESS_KEY=$(eval echo "$PARAM_AWS_CLI_SECRET_ACCESS_KEY")
+            AWS_DEFAULT_REGION=$(eval echo "$PARAM_AWS_CLI_REGION")
+            # configure aws for this job
+            aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID" 
+            aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY" 
+            # cleanup
+            unset AWS_ACCESS_KEY_ID
+            unset AWS_USER_SECRET_ACCESS_KEY
+          environment:
+            PARAM_AWS_CLI_ACCESS_KEY_ID: <<parameters.access_key_id>>
+            PARAM_AWS_CLI_REGION: <<parameters.region>>
+            PARAM_AWS_CLI_SECRET_ACCESS_KEY: <<parameters.secret_access_key>>
+# Ansible
+  install_ansible:
+    description: >
+      Check if ansible exist
+    steps: 
+      - run: 
+          name: Install ansible
+          command: |
+            export PIP=$(which pip pip3 | head -1)
+            if [[ -n $PIP ]]; then
+              if which sudo > /dev/null; then
+                sudo $PIP install ansible --upgrade
+              else
+                $PIP install ansible --upgrade --user
+              fi 
+            else
+              if which sudo > /dev/null; then
+                sudo apt update
+                sudo apt install python3-pip
+                sudo pip3 install ansible --upgrade
+              else 
+                apt update
+                apt install python3-pip
+                pip3 install ansible --upgrade
+              fi
+            fi 
+  configure_ansible:
+    description: >
+      Configure ansible ssh with aws secrets.
+      IAM Admin user credentials required to share key.
+      Requires aws cli
+    steps: 
+      - run: 
+          name: Configure ansible
+          command: |
+            # SSH connection configuration
+            if [ "${HOME}" = "/" ]
+            then
+              export HOME=$(getent passwd $(id -un) | cut -d: -f6)
+            fi
+            #printf "%s" '$EC2_HOST ssh-ed25519 QbM8rDBaZ9yajNovvO09gv+ks71u1c1y0C4S6Bt39CE' >> "$HOME/.ssh/known_hosts"
+            #chmod 0600 "$HOME/.ssh/known_hosts"
+            if [ -f "$HOME/.ssh/id_ed25519" ]; then
+              rm -f "$HOME/.ssh/id_ed25519"
+            fi
+            #access ssh key from aws secrets
+            aws ssm get-parameter \
+                --name /aws/reference/secretsmanager/udapeople_ssh_key \
+                --with-decryption --output text --query "Parameter.Value" > "$HOME/.ssh/id_ed25519"
+            chmod 0700 "$HOME/.ssh/id_ed25519" 
+            echo "$HOME/.ssh" > /tmp/SSH_CONFIG_DIR
+            chmod 0700 /tmp/SSH_CONFIG_DIR
+
+# create_changes
+# Multi IAM User and roles needed for various steps in creating
+# aws infrasturcture.
+# Here is where users with different credentials access aws.
+# The critical issue is setting up aws cli env variables and config for those iam users when needed.
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_DEFAULT_REGION could be set in a restricted context or project level
+# but it will create an issue of only allowing one user whose credentials are set at that level.
+# Another solution will be to create different profiles/credentials in 
+# AWS_CONFIG_FILE~/.aws/config and AWS_SHARED_CREDENTIALS_FILE=~/.aws/credentials then use them here with a shared workspace. 
+  create_changes:
+    description: Create stack infrasturcture changes 
+    parameters:
+      access_key_id: 
+        type: string
+        description: AWS access key Id
+        default: $AWS_USER_ACCESS_KEY_ID
+      secret_access_key: 
+        type: string
+        description: AWS secret access key
+        default: $AWS_USER_SECRET_ACCESS_KEY
+      region: 
+        type: string
+        description: AWS default region
+        default: $AWS_DEFAULT_REGION
+      stackname:
+        description: Name of top level stack 
+        type: string
+      workflowID: 
+        description: Deployment workflow ID
+        type: string
+        default: "${CIRCLE_WORKFLOW_ID:0:7}"
+      resourceID: 
+        description: Unique resource identifier
+        type: string
+      s3bucket:
+        description: Name of S3 bucket to store cloudformation artifacts 
+        type: string
+        default: $CFN_BUCKET
+      changename:
+        description: Name of stack change set
+        type: string 
+      version:
+        description: Template version
+        type: string 
+      capabilities:
+        description: IAM user 
+        type: string
+        default: $AWS_IAM   
+      type:
+        description: Type of change 
+        type: string
+        default: UPDATE 
+    steps:
+      - configure_aws:
+          access_key_id: <<parameters.access_key_id>>
+          secret_access_key: <<parameters.secret_access_key>>
+          region: <<parameters.region>>
+      - run:
+          name: Upload artifacts to S3 
+          command: |
+            cd .circleci/files/
+            aws cloudformation package --template-file \
+              stacks_v<<parameters.version>>.yaml \
+              --s3-bucket <<parameters.s3bucket>> \
+              --output-template-file stacks_v<<parameters.version>>-packaged.yaml
+      - run: 
+          name: Wait for local file
+          command: |
+            # Wait for local file
+            while [ ! -f ".circleci/files/stacks_v<<parameters.version>>-packaged.yaml" ] ; do
+              echo "..."
+            done        
+      - run:
+          name: Apply <<parameters.changename>> changes
+          command: |
+            if [[ <<parameters.version>> != "1.6" ]]; then
+              change_set_ID=$(aws --output text --query "Id" cloudformation create-change-set \
+                --stack-name <<parameters.stackname>> \
+                --template-body file://.circleci/files/stacks_v<<parameters.version>>-packaged.yaml \
+                --parameters ParameterKey=resourceID,ParameterValue=$PARAM_UNIQUE_ID \
+                --capabilities <<parameters.capabilities>> \
+                --change-set-name <<parameters.changename>> \
+                --change-set-type <<parameters.type>> )
+            else
+              change_set_ID=$(aws --output text --query "Id" cloudformation create-change-set \
+                --stack-name <<parameters.stackname>> \
+                --template-body file://.circleci/files/stacks_v<<parameters.version>>-packaged.yaml \
+                --parameters ParameterKey=resourceID,ParameterValue=$PARAM_UNIQUE_ID \
+                ParameterKey=workflowID,ParameterValue=$PARAM_WORKFLOW_ID \
+                --capabilities <<parameters.capabilities>> \
+                --change-set-name <<parameters.changename>> \
+                --change-set-type <<parameters.type>> )
+            fi
+          environment: 
+            PARAM_UNIQUE_ID: <<parameters.resourceID>>
+            PARAM_WORKFLOW_ID: <<parameters.workflowID>>
+      - run:
+          name: <<parameters.changename>> Status 
+          command: |
+            while [ 1 ]   # Endless loop.
+            do
+                change_Status=$(aws --output text --query "Status" cloudformation describe-change-set \
+                    --change-set-name <<parameters.changename>> --stack-name <<parameters.stackname>>)
+                echo "Change Status: $change_Status"
+                if [[ $change_Status == "CREATE_COMPLETE" ]]; then
+                    echo "Exiting change-set status: $change_Status"
+                    exit 0
+                fi
+                sleep 5
+            done
+      - run:
+          name: Ensure <<parameters.changename>>  exist
+          command: |
+            aws cloudformation execute-change-set --change-set-name <<parameters.changename>> --stack-name <<parameters.stackname>>
+      - run:
+          name: Creation Status 
+          command: |
+            while [ 1 ]   # Endless loop.
+            do
+                stack_Status=$(aws --output text --query "Stacks[0].StackStatus" cloudformation describe-stacks \
+                    --stack-name <<parameters.stackname>>)
+                echo "Stack Status: $stack_Status"
+                if [[ $stack_Status == "CREATE_COMPLETE" || $stack_Status == "UPDATE_COMPLETE"  ]]; then
+                    echo "Exiting stack status: $stack_Status"
+                    exit 0
+                elif [[ $stack_Status == "CREATE_FAILED" || $stack_Status == "ROLLBACK_IN_PROGRESS" || $stack_Status == "ROLLBACK_COMPLETE" || $stack_Status == "UPDATE_ROLLBACK_COMPLETE" || $stack_Status == "DELETE_IN_PROGRESS" ]]; then
+                    echo "Exiting stack status: $stack_Status"
+                    exit 1
+                fi
+                sleep 5
+            done
+      - run:
+          name: Cleanup aws config
+          command: |
+            # cleanup
+            rm -f $AWS_SHARED_CREDENTIALS_FILE
+            rm -f $AWS_CONFIG_FILE
+  security_changes:
+    description: Create IAM roles and Security groups 
+    parameters:
+      access_key_id: 
+        type: string
+        description: AWS access key Id
+        default: $AWS_ADMIN_ACCESS_KEY_ID
+      secret_access_key: 
+        type: string
+        description: AWS secret access key
+        default: $AWS_ADMIN_SECRET_ACCESS_KEY
+      region: 
+        type: string
+        description: AWS default region
+        default: $AWS_DEFAULT_REGION
+      stackname:
+        description: Name of top level stack 
+        type: string
+      workflowID: 
+        description: Deployment workflow ID
+        type: string
+        default: "${CIRCLE_WORKFLOW_ID:0:7}"
+      resourceID: 
+        description: Unique resource identifier
+        type: string
+      changename:
+        description: Name of stack change set
+        type: string 
+      type:
+        description: Type of change 
+        type: string
+        default: UPDATE  
+      version:
+        description: Template version
+        type: string 
+    steps:     
+      - create_changes:
+          access_key_id: <<parameters.access_key_id>>
+          secret_access_key: <<parameters.secret_access_key>>
+          region: <<parameters.region>>
+          resourceID: <<parameters.resourceID>>
+          stackname: <<parameters.stackname>>
+          workflowID: <<parameters.workflowID>>
+          changename: <<parameters.changename>>
+          version: <<parameters.version>>
+          type: <<parameters.type>>
+# 
+jobs:
+  build:
+    docker:
+    # Use the same Docker base as the project
+      - image: python:3.7.3-stretch
+
+    working_directory: ~/repo
+     
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "requirements.txt" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          name: install dependencies
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            make install
+            # Install hadolint
+            wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.16.3/hadolint-Linux-x86_64 &&\
+                chmod +x /bin/hadolint
+
+      - save_cache:
+          paths:
+            - ./venv
+          key: v1-dependencies-{{ checksum "requirements.txt" }}
+
+      # run lint!
+      - run:
+          name: run lint
+          command: |
+            . venv/bin/activate
+            make lint           
+workflows:
+  default:
+    jobs:
+      - build:
+          pre-steps: # Check commit message if NO_BUILD
+            - cancel-workflow   
+          context:
+            - org-global
+            - aws-context
+          filters:
+            branches:
+              only: master
