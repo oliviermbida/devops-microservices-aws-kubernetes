@@ -29,8 +29,8 @@ Parameters:
     Default: "AWS Cloud9 Instance"
   ImageId:
     Description:  Identifier for the Amazon Machine Image (AMI) 
-    Type: String
-    Default: "ubuntu-18.04-x86_64"
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: resolve:ssm:/aws/service/cloud9/amis/ubuntu-18.04-x86_64
   InstanceUser:
     Description: User used to boot ec2 instance
     Type: String
