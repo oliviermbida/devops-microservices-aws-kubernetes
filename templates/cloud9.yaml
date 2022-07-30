@@ -61,7 +61,9 @@ Parameters:
 ################## SSM BOOTSRAP HANDLER ###############
   Cloud9OutputBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
+    Tags:
+      - Key: Name
+        Value: s3-Cloud9-${workflowID}
 
   Cloud9SSMDocument: 
     Type: AWS::SSM::Document
