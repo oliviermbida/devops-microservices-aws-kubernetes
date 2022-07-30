@@ -312,7 +312,7 @@ commands:
               change_set_ID=$(aws --output text --query "Id" cloudformation create-change-set \
                 --stack-name <<parameters.stackname>> \
                 --template-body file://stacks_v<<parameters.version>>-packaged.yaml \
-                ParameterKey=workflowID,ParameterValue=$PARAM_WORKFLOW_ID \
+                --parameters ParameterKey=workflowID,ParameterValue=$PARAM_WORKFLOW_ID \
                 --capabilities <<parameters.capabilities>> \
                 --change-set-name <<parameters.changename>> \
                 --change-set-type <<parameters.type>> )
