@@ -39,7 +39,7 @@ Parameters:
   EnvName:
     Description: Name of the environment.
     Type: String
-    Default: ${AWS::StackName}
+    Default: !Sub ${AWS::StackName}
   GitRepoName:
     Description: Git repository name to be cloned.
     Type: String
@@ -65,15 +65,15 @@ Resources:
       DeletionPolicy: Delete
       Tags:
         - Key: Name
-          Value: s3-Cloud9-${workflowID}
+          Value: !Sub s3-Cloud9-${workflowID}
 
   Cloud9SSMDocument: 
     Type: AWS::SSM::Document
     Properties: 
       Tags:
         - Key: Environment
-          Value: Cloud9-${workflowID}
-      DocumentFormat: Yaml
+          Value: !Sub Cloud9-${workflowID}
+      DocumentFormat: YAML
       DocumentType: Command
       Content: 
         schemaVersion: '2.2'
@@ -87,19 +87,22 @@ Resources:
             - date
             - echo LANG=en_US.utf-8 >> /etc/environment
             - echo LC_ALL=en_US.UTF-8 >> /etc/environment
-            - . /home/${InstanceUser}/.bashrc
+            - !Sub EC2_USER=${InstanceUser}
+            - !Sub SSH_KEY=${GithubSshKeyName}
+            - !Sub GIT_REPO=${GitRepoName}
+            - . /home/$EC2_USER/.bashrc
             - echo '=== Configure ssh agent ==='
-            - aws ssm get-parameter --name /aws/reference/secretsmanager/${GithubSshKeyName} --with-decryption --output text --query "Parameter.Value" > "~/.ssh/id_ed25519"
+            - aws ssm get-parameter --name /aws/reference/secretsmanager/$SSH_KEY --with-decryption --output text --query "Parameter.Value" > "~/.ssh/id_ed25519"
             - chmod 0700 "~/.ssh/id_ed25519"
             - echo "Host github.com" >> ~/.ssh/config
             - echo "    User ${GitUserName}" >> ~/.ssh/config
             - echo "    IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
             - chmod 0700 "~/.ssh/config"
             - echo '=== Clone git repository ==='
-            - git clone git@github.com:${GitRepoName}.git
+            - git clone git@github.com:$GIT_REPO.git
             - echo '=== Install Circleci cli ==='
             - curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh
-            - sudo -H -u ${InstanceUser} bash -c "./install.sh"
+            - sudo -H -u $EC2_USER bash -c "./install.sh"
             - echo "Bootstrap completed with return code $?"
   Cloud9BootstrapAssociation: 
     Type: AWS::SSM::Association
@@ -115,7 +118,6 @@ Resources:
           Values:
           - Active
   Cloud9Instance:
-    Description: "-"
     DependsOn: Cloud9BootstrapAssociation
     Type: AWS::Cloud9::EnvironmentEC2
     Properties:
@@ -135,7 +137,7 @@ Resources:
           Value: Active
         - 
           Key: Environment
-          Value: Cloud9-${workflowID}
+          Value: !Sub Cloud9-${workflowID}
 
 Outputs: 
   Cloud9IDE:
