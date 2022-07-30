@@ -73,7 +73,7 @@ Resources:
       Tags:
         - Key: Environment
           Value: Cloud9-${workflowID}
-      Content: Yaml
+      DocumentFormat: Yaml
       DocumentType: Command
       Content: 
         schemaVersion: '2.2'
