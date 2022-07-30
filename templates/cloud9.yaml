@@ -30,7 +30,7 @@ Parameters:
   ImageId:
     Description:  Identifier for the Amazon Machine Image (AMI) 
     Type: AWS::EC2::Image::Id
-    Default: ubuntu-18.04-x86_64
+    Default: ami-0729e439b6769d6ab
   InstanceUser:
     Description: User used to boot ec2 instance
     Type: String
