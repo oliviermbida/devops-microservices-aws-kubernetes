@@ -1,4 +1,0 @@
-templates:
-  - *.yaml
-# ignore_templates:
-#   - stacks.yaml
