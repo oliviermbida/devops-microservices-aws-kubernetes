@@ -61,9 +61,10 @@ Parameters:
 ################## SSM BOOTSRAP HANDLER ###############
   Cloud9OutputBucket:
     Type: AWS::S3::Bucket
-    Tags:
-      - Key: Name
-        Value: s3-Cloud9-${workflowID}
+    Properties:
+      Tags:
+        - Key: Name
+          Value: s3-Cloud9-${workflowID}
 
   Cloud9SSMDocument: 
     Type: AWS::SSM::Document
