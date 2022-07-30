@@ -424,7 +424,7 @@ jobs:
           working_directory: ./templates
           command: |
             . ~/.venv/bin/activate
-            cfn-lint *.yaml          
+            cfn-lint *.yaml  -z custom_rules.txt      
 
       # security_changes : 
       # This is run by an IAM user with admin role
