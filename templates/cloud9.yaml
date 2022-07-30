@@ -91,18 +91,12 @@ Parameters:
             - echo "    User ${GitUserName}" >> ~/.ssh/config
             - echo "    IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
             - chmod 0700 "~/.ssh/config"
-            - #eval "$(ssh-agent -s)"
-            - #ssh-add ~/.ssh/id_ed25519
             - echo '=== Clone git repository ==='
             - git clone git@github.com:${GitRepoName}.git
             - echo '=== Install Circleci cli ==='
             - curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh
             - sudo -H -u ${InstanceUser} bash -c "./install.sh"
-            - #echo '=== Cleanup ==='
-            - #echo '=== PREPARE REBOOT in 1 minute with at ==='
-            - #FILE=$(mktemp) && echo $FILE && echo '#!/bin/bash' > $FILE && echo 'reboot -f --verbose' >> $FILE && at now + 1 minute -f $FILE
             - echo "Bootstrap completed with return code $?"
-  
   Cloud9BootstrapAssociation: 
     Type: AWS::SSM::Association
     DependsOn: Cloud9OutputBucket 
