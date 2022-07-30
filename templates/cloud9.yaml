@@ -57,11 +57,12 @@ Parameters:
     NoEcho: True
     Type: String
     Default: "githubsshkey"
-  
+Resources:
 ################## SSM BOOTSRAP HANDLER ###############
   Cloud9OutputBucket:
     Type: AWS::S3::Bucket
     Properties:
+      DeletionPolicy: Delete
       Tags:
         - Key: Name
           Value: s3-Cloud9-${workflowID}

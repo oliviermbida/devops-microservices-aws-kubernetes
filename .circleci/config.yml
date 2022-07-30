@@ -412,6 +412,19 @@ jobs:
           start_job: <<pipeline.parameters.run_deploy_cloud9>>
       - install_aws
       - checkout
+      - run:
+          name: install dependencies
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            # Install cfn-lint
+            pip install cfn-lint
+      - run:
+          name: run cfn lint
+          working_directory: ./templates
+          command: |
+            . venv/bin/activate
+            cfn-lint *.yaml          
 
       # security_changes : 
       # This is run by an IAM user with admin role
