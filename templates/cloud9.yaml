@@ -17,7 +17,7 @@ Parameters:
     ConstraintDescription: Must be a valid Cloud9 instance type
   AutomaticStopTimeMinutes:
     Description: Number of minutes until the running instance is shut down after the environment was last used.
-    Type: Integer
+    Type: String
     Default: 30
   ConnectionType:
     Description: Connection type used for connecting to an Amazon EC2 environment
