@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template for Cloud9 setups. Creates a Cloud9
+  development environment.
+Parameters:
+  workflowID:
+    Description: Deployment workflow ID
+    Type: String
+  Cloud9InstanceType:
+    Description: Cloud9 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t3.micro
+      - t3.small
+      - t3.medium
+    ConstraintDescription: Must be a valid Cloud9 instance type
+  AutomaticStopTimeMinutes:
+    Description: Number of minutes until the running instance is shut down after the environment was last used.
+    Type: Integer
+    Default: 30
+  ConnectionType:
+    Description: Connection type used for connecting to an Amazon EC2 environment
+    Type: String
+    Default: "CONNECT_SSH"
+  EnvDescription:
+    Description: Description of the environment to create.
+    Type: String
+    Default: "AWS Cloud9 Instance"
+  ImageId:
+    Description:  Identifier for the Amazon Machine Image (AMI) 
+    Type: String
+    Default: "ubuntu-18.04-x86_64"
+  InstanceUser:
+    Description: User used to boot ec2 instance
+    Type: String
+    NoEcho: True
+    Default: "ubuntu"
+  EnvName:
+    Description: Name of the environment.
+    Type: String
+    Default: ${AWS::StackName}
+  GitRepoName:
+    Description: Git repository name to be cloned.
+    Type: String
+    Default: "oliviermbida/devops-microservices-aws-kubernetes"
+  GitUserName:
+    Description: Git username 
+    Type: String
+    Default: "oliviermbida"
+  GitUserEmail:
+    Description: Git user email
+    Type: String
+    Default: ""
+  GithubSshKeyName:
+    Description: Github ssh key name stored in secretsmanager
+    NoEcho: True
+    Type: String
+    Default: "githubsshkey"
+  
+################## SSM BOOTSRAP HANDLER ###############
+  Cloud9OutputBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+
+  Cloud9SSMDocument: 
+    Type: AWS::SSM::Document
+    Properties: 
+      Tags:
+        - Key: Environment
+          Value: Cloud9-${workflowID}
+      Content: Yaml
+      DocumentType: Command
+      Content: 
+        schemaVersion: '2.2'
+        description: Bootstrap Cloud9 Instance
+        mainSteps:
+        - action: aws:runShellScript
+          name: Cloud9bootstrap
+          inputs:
+            runCommand:
+            - "#!/bin/bash"
+            - date
+            - echo LANG=en_US.utf-8 >> /etc/environment
+            - echo LC_ALL=en_US.UTF-8 >> /etc/environment
+            - . /home/${InstanceUser}/.bashrc
+            - echo '=== Configure ssh agent ==='
+            - aws ssm get-parameter --name /aws/reference/secretsmanager/${GithubSshKeyName} --with-decryption --output text --query "Parameter.Value" > "~/.ssh/id_ed25519"
+            - chmod 0700 "~/.ssh/id_ed25519"
+            - echo "Host github.com" >> ~/.ssh/config
+            - echo "    User ${GitUserName}" >> ~/.ssh/config
+            - echo "    IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
+            - chmod 0700 "~/.ssh/config"
+            - #eval "$(ssh-agent -s)"
+            - #ssh-add ~/.ssh/id_ed25519
+            - echo '=== Clone git repository ==='
+            - git clone git@github.com:${GitRepoName}.git
+            - echo '=== Install Circleci cli ==='
+            - curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh
+            - sudo -H -u ${InstanceUser} bash -c "./install.sh"
+            - #echo '=== Cleanup ==='
+            - #echo '=== PREPARE REBOOT in 1 minute with at ==='
+            - #FILE=$(mktemp) && echo $FILE && echo '#!/bin/bash' > $FILE && echo 'reboot -f --verbose' >> $FILE && at now + 1 minute -f $FILE
+            - echo "Bootstrap completed with return code $?"
+  
+  Cloud9BootstrapAssociation: 
+    Type: AWS::SSM::Association
+    DependsOn: Cloud9OutputBucket 
+    Properties: 
+      Name: !Ref Cloud9SSMDocument
+      OutputLocation: 
+        S3Location:
+          OutputS3BucketName: !Ref Cloud9OutputBucket
+          OutputS3KeyPrefix: bootstrapoutput
+      Targets:
+        - Key: tag:SSMBootstrap
+          Values:
+          - Active
+  Cloud9Instance:
+    Description: "-"
+    DependsOn: Cloud9BootstrapAssociation
+    Type: AWS::Cloud9::EnvironmentEC2
+    Properties:
+      Description: 
+        Ref: EnvDescription 
+      AutomaticStopTimeMinutes: 
+        Ref: AutomaticStopTimeMinutes
+      ConnectionType: 
+        Ref: ConnectionType
+      InstanceType:
+        Ref: Cloud9InstanceType
+      Name:
+        Ref: EnvName
+      Tags: 
+        - 
+          Key: SSMBootstrap
+          Value: Active
+        - 
+          Key: Environment
+          Value: Cloud9-${workflowID}
+
+Outputs: 
+  Cloud9IDE:
+    Value:
+      Fn::Join:
+      - ''
+      - - https://
+        - Ref: AWS::Region
+        - ".console.aws.amazon.com/cloud9/ide/"
+        - Ref: Cloud9Instance
+        - "?region="
+        - Ref: AWS::Region

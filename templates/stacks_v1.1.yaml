@@ -1,0 +1,29 @@
+Description: >
+  Nested top level Stack Update version 1.1
+  Cloud9 deployment
+Parameters:
+  workflowID:
+    Description: Deployment workflow ID
+    Type: String
+
+Resources:
+  compliance:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        workflowID: !Ref workflowID
+      TemplateURL: security.yaml
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-compliance-${workflowID}'
+  cloud9:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: 
+      - compliance
+    Properties:
+      Parameters:
+        workflowID: !Ref workflowID
+      TemplateURL: cloud9.yaml
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cloud9-${workflowID}'
