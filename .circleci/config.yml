@@ -309,13 +309,13 @@ commands:
           name: Apply <<parameters.changename>> changes
           working_directory: ./templates
           command: |
-              change_set_ID=$(aws --output text --query "Id" cloudformation create-change-set \
-                --stack-name <<parameters.stackname>> \
-                --template-body file://stacks_v<<parameters.version>>-packaged.yaml \
-                --parameters ParameterKey=workflowID,ParameterValue=$PARAM_WORKFLOW_ID \
-                --capabilities <<parameters.capabilities>> \
-                --change-set-name <<parameters.changename>> \
-                --change-set-type <<parameters.type>> )
+            change_set_ID=$(aws --output text --query "Id" cloudformation create-change-set \
+              --stack-name <<parameters.stackname>> \
+              --template-body file://stacks_v<<parameters.version>>-packaged.yaml \
+              --parameters ParameterKey=workflowID,ParameterValue=$PARAM_WORKFLOW_ID \
+              --capabilities <<parameters.capabilities>> \
+              --change-set-name <<parameters.changename>> \
+              --change-set-type <<parameters.type>> )
           environment: 
             PARAM_WORKFLOW_ID: <<parameters.workflowID>>
       - run:
