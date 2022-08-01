@@ -15,6 +15,9 @@ validate-circleci:
 
 run-circleci-local:
 	# See https://circleci.com/docs/2.0/local-cli/#running-a-job
+	# chgrp -R git objects
+	# chmod -R g+rws objects
+	# chmod -R 777 .git/objects
 	circleci local execute 
 deploy-cloud9:
 	# See https://circleci.com/docs/2.0/local-cli/#running-a-job
