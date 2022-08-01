@@ -9,10 +9,13 @@ parameters:
   #   default: false
   run_deploy_cloud9:
     type: boolean
-    default: true
+    default: false
   # # run_configure_cloud9:
   # #   type: boolean
   # #   default: true
+  run_build:
+    type: boolean
+    default: true
   # commit:
   #   type: boolean
   #   default: false
@@ -406,8 +409,21 @@ commands:
 jobs:
   deploy-cloud9:
     docker:
-      - image: cimg/python:3.9.13-node
+      - image: cimg/base:2020.05 #cimg/python:3.9.13-node
     steps:
+      # # fix for local builds https://github.com/CircleCI-Public/circleci-cli/issues/330
+      # - run:
+      #     name: Local build handling
+      #     command: |
+      #       sudo rm -r /tmp/_circleci_local_build_repo/workdir
+      #       if [[ ${CIRCLE_SHELL_ENV} =~ "localbuild" ]]; then
+      #         if [ -d /workdir ]; then
+      #           sudo ln -s /workdir /tmp/_circleci_local_build_repo
+      #         else
+      #           echo "Run this local build using: circleci build -v \$(pwd):/workdir"
+      #           exit 1
+      #         fi
+      #       fi  
       - check_job:
           start_job: <<pipeline.parameters.run_deploy_cloud9>>
       - install_aws
@@ -491,42 +507,43 @@ jobs:
   #           # cleanup
   #           rm -f $AWS_SHARED_CREDENTIALS_FILE
   #           rm -f $AWS_CONFIG_FILE
-  # build:
-  #   docker:
-  #   # Use the same Docker base as the project
-  #     - image: python:3.7.3-stretch
+  build:
+    docker:
+    # Use the same Docker base as the project
+      - image: python:3.7.3-stretch
 
-  #   working_directory: ~/repo
+    working_directory: ~/repo
      
-  #   steps:
-  #     - checkout
-  #     # Download and cache dependencies
-  #     - restore_cache:
-  #         keys:
-  #           - v1-dependencies-{{ checksum "requirements.txt" }}
-  #           # fallback to using the latest cache if no exact match is found
-  #           - v1-dependencies-
-  #     - run:
-  #         name: install dependencies
-  #         command: |
-  #           python3 -m venv venv
-  #           . venv/bin/activate
-  #           make install
-  #           # Install hadolint
-  #           wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.16.3/hadolint-Linux-x86_64 &&\
-  #               chmod +x /bin/hadolint
+    steps:
+      - check_job:
+          start_job: <<pipeline.parameters.run_build>>
 
-  #     - save_cache:
-  #         paths:
-  #           - ./venv
-  #         key: v1-dependencies-{{ checksum "requirements.txt" }}
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "requirements.txt" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          name: install dependencies
+          command: |
+            make setup
+            make install
+            # Install hadolint
+            wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.16.3/hadolint-Linux-x86_64 && \
+                chmod +x /bin/hadolint
 
-  #     # run lint!
-  #     - run:
-  #         name: run lint
-  #         command: |
-  #           . venv/bin/activate
-  #           make lint           
+      - save_cache:
+          paths:
+            - ./venv
+          key: v1-dependencies-{{ checksum "requirements.txt" }}
+
+      # run lint!
+      - run:
+          name: run lint
+          command: |
+            make lint           
 workflows:
   default:
     jobs:
@@ -548,12 +565,12 @@ workflows:
       #     filters:
       #       branches:
       #         only: master
-      # - build:
-      #     pre-steps: # Check commit message if NO_BUILD
-      #       - cancel-workflow   
-      #     context:
-      #       - org-global
-      #       - aws-context
-      #     filters:
-      #       branches:
-      #         only: master
+      - build:
+          pre-steps: # Check commit message if NO_BUILD
+            - cancel-workflow   
+          context:
+            - org-global
+            - aws-context
+          filters:
+            branches:
+              only: master

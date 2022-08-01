@@ -5,15 +5,27 @@ setup:
 
 install:
 	# This should be run from inside a virtualenv
-	pip install --upgrade pip &&\
+	. ~/.devops/bin/activate
+	pip install --upgrade pip && \
 		pip install -r requirements.txt
 
+validate-circleci:
+	# See https://circleci.com/docs/2.0/local-cli/#processing-a-config
+	circleci config process .circleci/config.yml 
+
+run-circleci-local:
+	# See https://circleci.com/docs/2.0/local-cli/#running-a-job
+	circleci local execute 
+deploy-cloud9:
+	# See https://circleci.com/docs/2.0/local-cli/#running-a-job
+	circleci local execute --job deploy-cloud9
 test:
 	# Additional, optional, tests could go here
 	#python -m pytest -vv --cov=myrepolib tests/*.py
 	#python -m pytest --nbval notebook.ipynb
 
 lint:
+	. ~/.devops/bin/activate
 	# See local hadolint install instructions:   https://github.com/hadolint/hadolint
 	# This is linter for Dockerfiles
 	hadolint Dockerfile
