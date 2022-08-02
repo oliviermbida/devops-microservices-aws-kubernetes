@@ -16,6 +16,9 @@ parameters:
   run_build:
     type: boolean
     default: true
+  run_deploy_app:
+    type: boolean
+    default: true  
   # commit:
   #   type: boolean
   #   default: false
@@ -518,10 +521,6 @@ jobs:
     steps:
       - check_job:
           start_job: <<pipeline.parameters.run_build>>
-      - install_aws
-      - configure_aws:
-          access_key_id: $AWS_ADMIN_ACCESS_KEY_ID
-          secret_access_key: $AWS_ADMIN_SECRET_ACCESS_KEY
       - checkout
       # Download and cache dependencies
       - restore_cache:
@@ -546,7 +545,23 @@ jobs:
       - run:
           name: run lint
           command: |
-            make lint     
+            make lint
+            
+  deploy-app:
+    docker:
+      - image: cimg/base:2020.05 
+    steps:
+      - check_job:
+          start_job: <<pipeline.parameters.run_deploy_app>>
+      - install_aws
+      - configure_aws:
+          access_key_id: $AWS_ADMIN_ACCESS_KEY_ID
+          secret_access_key: $AWS_ADMIN_SECRET_ACCESS_KEY
+      - checkout
+      - run:
+          name: install dependencies
+          command: |
+            sudo apt install -y jq       
       - run:
           name: Build app and push to dockerhub
           command: |
@@ -581,6 +596,7 @@ jobs:
             # To reduce security risk configure docker credential store before login
             # https://docs.docker.com/engine/reference/commandline/login/#credentials-store
             rm -rf ~/.docker/config.json
+
 workflows:
   default:
     jobs:
@@ -611,3 +627,14 @@ workflows:
           filters:
             branches:
               only: master
+      - deploy-app:
+          pre-steps: # Check commit message if NO_BUILD
+            - cancel-workflow  
+          requires: 
+            - build    
+          context:
+            - org-global
+            - aws-context
+          filters:
+            branches:
+              only: master  
