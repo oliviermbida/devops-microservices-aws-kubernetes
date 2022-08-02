@@ -575,7 +575,7 @@ jobs:
                 --with-decryption --output text --query "Parameter.Value" | jq -r ."password") 
             printf "%s/%s" "${DOCKERHUB_USERNAME}" "flask-app-prediction" > /tmp/docker_tag.out
             dockerpath=$(cat /tmp/docker_tag.out)
-            printf "dockerpatch=%s" "$dockerpath" > /tmp/.env.ci
+            printf "dockerpath=%s" "$dockerpath" > /tmp/.env.ci
             echo "Docker ID and Image: $dockerpath"
             echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin 
             # docker build --tag "$dockerpath:latest" .
