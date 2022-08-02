@@ -576,10 +576,10 @@ jobs:
       - run:
           name: cleanup
           command: |
-          # WARNING! Your password will be stored unencrypted in ~/.docker/config.json.
-          # Rotate dockerhub and AWS ECR credentials
-          # To reduce security risk configure docker credential store before login
-          # https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+            # WARNING! Your password will be stored unencrypted in ~/.docker/config.json.
+            # Rotate dockerhub and AWS ECR credentials
+            # To reduce security risk configure docker credential store before login
+            # https://docs.docker.com/engine/reference/commandline/login/#credentials-store
             rm -rf ~/.docker/config.json
 workflows:
   default:
