@@ -575,9 +575,9 @@ jobs:
             dockerpatch=$(cat /tmp/docker_tag.out)
             echo "Docker ID and Image: $dockerpath"
             echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin 
-            docker build --tag "$dockerpath:latest" .
+            docker build --tag "$dockerpath" .
             docker image ls
-            docker push "$dockerpath:latest"
+            docker push "$dockerpath"
       - run:
           name: Tag app image and push to AWS ECR
           command: |
@@ -589,8 +589,11 @@ jobs:
             docker image ls
             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
             docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
+            #cleanup
+            rm -rf ~/.docker/config.json
       - run:
           name: cleanup
+          when: on_fail
           command: |
             # WARNING! Your password will be stored unencrypted in ~/.docker/config.json.
             # Rotate dockerhub and AWS ECR credentials
