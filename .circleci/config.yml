@@ -547,9 +547,13 @@ jobs:
             make lint
             
   deploy-app:
-    docker:
-      - image: cimg/base:2020.05 
+    # docker:
+    #   - image: cimg/base:2020.05 
+    machine:
+      image: ubuntu-2204:2022.04.2    
     steps:
+      # - setup_remote_docker:
+      #     version: 20.10.14  
       - check_job:
           start_job: <<pipeline.parameters.run_deploy_app>>
       - install_aws
