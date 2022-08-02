@@ -518,7 +518,10 @@ jobs:
     steps:
       - check_job:
           start_job: <<pipeline.parameters.run_build>>
-
+      - install_aws
+      - configure_aws:
+          access_key_id: $AWS_ADMIN_ACCESS_KEY_ID
+          secret_access_key: $AWS_ADMIN_SECRET_ACCESS_KEY
       - checkout
       # Download and cache dependencies
       - restore_cache:
@@ -531,6 +534,7 @@ jobs:
           command: |
             make setup
             make install
+            sudo apt install -y jq 
             # Install hadolint
             wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.16.3/hadolint-Linux-x86_64 && \
                 chmod +x /bin/hadolint
@@ -539,12 +543,44 @@ jobs:
           paths:
             - ./venv
           key: v1-dependencies-{{ checksum "requirements.txt" }}
-
-      # run lint!
       - run:
           name: run lint
           command: |
-            make lint           
+            make lint     
+      - run:
+          name: Build app and push to dockerhub
+          command: |
+            # Get dockerhub credentials from aws secretsmanager
+            DOCKERHUB_USERNAME=$(aws --with-decryption --output text --query "Parameter.Value" | jq -r ."username" ssm get-parameter \
+                --name /aws/reference/secretsmanager/dockerhub )
+            DOCKERHUB_PASSWORD=$(aws --with-decryption --output text --query "Parameter.Value" | jq -r ."password" ssm get-parameter \
+                --name /aws/reference/secretsmanager/dockerhub ) 
+            printf "%s/%s" "${DOCKERHUB_USERNAME}" "flask-app-prediction" > /tmp/docker_tag.out
+            dockerpatch=$(cat /tmp/docker_tag.out)
+            echo "Docker ID and Image: $dockerpath"
+            echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin 
+            docker build --tag "$dockerpath:latest" .
+            docker image ls
+            docker push "$dockerpath:latest"
+      - run:
+          name: Tag app image and push to AWS ECR
+          command: |
+            # Get AWS details
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+            AWS_REGION=$(aws configure get region)
+            dockerpatch=$(cat /tmp/docker_tag.out)
+            docker tag "$dockerpath:latest" $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
+            docker image ls
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+            docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
+      - run:
+          name: cleanup
+          command: |
+          # WARNING! Your password will be stored unencrypted in ~/.docker/config.json.
+          # Rotate dockerhub and AWS ECR credentials
+          # To reduce security risk configure docker credential store before login
+          # https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+          rm -rf ~/.docker/config.json
 workflows:
   default:
     jobs:
