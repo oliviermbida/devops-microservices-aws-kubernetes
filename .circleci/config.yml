@@ -15,7 +15,7 @@ parameters:
   # #   default: true
   run_build:
     type: boolean
-    default: false
+    default: true
   # commit:
   #   type: boolean
   #   default: false
