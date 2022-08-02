@@ -560,8 +560,9 @@ jobs:
       - run:
           name: install dependencies
           command: |
+            sudo apt-get update 
             sudo apt install -y jq
-            sudo apt-get install docker-compose-plugin
+            sudo apt-get install -y docker-compose-plugin
       - run:
           name: Build app and push to dockerhub
           command: |
