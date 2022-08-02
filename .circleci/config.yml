@@ -556,7 +556,7 @@ jobs:
       #     version: 20.10.14  
       - check_job:
           start_job: <<pipeline.parameters.run_deploy_app>>
-      - install_aws
+      # - install_aws
       - configure_aws:
           access_key_id: $AWS_ADMIN_ACCESS_KEY_ID
           secret_access_key: $AWS_ADMIN_SECRET_ACCESS_KEY
