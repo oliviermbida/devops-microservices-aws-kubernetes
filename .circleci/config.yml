@@ -593,8 +593,9 @@ jobs:
             # Get AWS details
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
             AWS_REGION=$(aws configure get region)
-            dockerpath=$(cat /tmp/docker_tag.out)
-            docker tag "$dockerpath:latest" $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
+            #dockerpath=$(cat /tmp/docker_tag.out)
+            docker build --tag "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction" .
+            #docker tag "$dockerpath:latest" $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
             docker image ls
             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
             docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
