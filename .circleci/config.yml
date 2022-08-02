@@ -546,6 +546,7 @@ jobs:
           command: |
             make lint
             
+  # https://circleci.com/docs/building-docker-images          
   deploy-app:
     # docker:
     #   - image: cimg/base:2020.05 
@@ -592,15 +593,17 @@ jobs:
             # Get AWS details
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
             AWS_REGION=$(aws configure get region)
-            dockerpatch=$(cat /tmp/docker_tag.out)
+            dockerpath=$(cat /tmp/docker_tag.out)
             docker tag "$dockerpath:latest" $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
             docker image ls
             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
             docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
             #cleanup
             rm -rf ~/.docker/config.json
+            rm -f $AWS_SHARED_CREDENTIALS_FILE
+            rm -f $AWS_CONFIG_FILE            
       - run:
-          name: cleanup
+          name: Cleanup docker config
           when: on_fail
           command: |
             # WARNING! Your password will be stored unencrypted in ~/.docker/config.json.
@@ -608,7 +611,13 @@ jobs:
             # To reduce security risk configure docker credential store before login
             # https://docs.docker.com/engine/reference/commandline/login/#credentials-store
             rm -rf ~/.docker/config.json
-
+      - run:
+          name: Cleanup aws config
+          when: on_fail
+          command: |
+            # cleanup
+            rm -f $AWS_SHARED_CREDENTIALS_FILE
+            rm -f $AWS_CONFIG_FILE
 workflows:
   default:
     jobs:
