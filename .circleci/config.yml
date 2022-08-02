@@ -565,10 +565,12 @@ jobs:
           name: Build app and push to dockerhub
           command: |
             # Get dockerhub credentials from aws secretsmanager
-            DOCKERHUB_USERNAME=$(aws --with-decryption --output text --query "Parameter.Value" | jq -r ."username" ssm get-parameter \
-                --name /aws/reference/secretsmanager/dockerhub )
-            DOCKERHUB_PASSWORD=$(aws --with-decryption --output text --query "Parameter.Value" | jq -r ."password" ssm get-parameter \
-                --name /aws/reference/secretsmanager/dockerhub ) 
+            DOCKERHUB_USERNAME=$(aws ssm get-parameter \
+                --name /aws/reference/secretsmanager/dockerhub \
+                --with-decryption --output text --query "Parameter.Value" | jq -r ."username")
+            DOCKERHUB_PASSWORD=$(aws ssm get-parameter \
+                --name /aws/reference/secretsmanager/dockerhub \
+                --with-decryption --output text --query "Parameter.Value" | jq -r ."password") 
             printf "%s/%s" "${DOCKERHUB_USERNAME}" "flask-app-prediction" > /tmp/docker_tag.out
             dockerpatch=$(cat /tmp/docker_tag.out)
             echo "Docker ID and Image: $dockerpath"
