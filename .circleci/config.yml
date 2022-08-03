@@ -593,12 +593,17 @@ jobs:
             # Get AWS details
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
             AWS_REGION=$(aws configure get region)
-            #dockerpath=$(cat /tmp/docker_tag.out)
-            docker build --tag "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction" .
-            #docker tag "$dockerpath:latest" $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
+            AWS_ECR_ACCOUNT_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+            AWS_ECR_REPO=ai-cloudsolutions
+            dockerpath=$(cat /tmp/docker_tag.out)
+            docker tag "${dockerpath}:latest" "${AWS_ECR_ACCOUNT_URL}/${AWS_ECR_REPO}:flask-app-prediction"
             docker image ls
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-            docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/ai-cloudsolutions:flask-app-prediction
+            if cat ~/.docker/config.json | grep "${AWS_ECR_ACCOUNT_URL}" > /dev/null 2>&1 ; then
+              echo "ECR credential helper is already installed"
+            else
+              aws ecr get-login-password --region "${AWS_REGION}" "$@" | docker login --username AWS --password-stdin "${AWS_ECR_ACCOUNT_URL}"
+            fi
+            docker push "${AWS_ECR_ACCOUNT_URL}/${AWS_ECR_REPO}:flask-app-prediction"
             #cleanup
             rm -rf ~/.docker/config.json
             rm -f $AWS_SHARED_CREDENTIALS_FILE
