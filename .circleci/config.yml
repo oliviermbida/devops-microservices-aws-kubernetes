@@ -544,6 +544,7 @@ jobs:
       - run:
           name: run lint
           command: |
+            . ~/.devops/bin/activate
             make lint
             
   # https://circleci.com/docs/building-docker-images          
