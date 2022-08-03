@@ -594,7 +594,9 @@ jobs:
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
             AWS_REGION=$(aws configure get region)
             AWS_ECR_ACCOUNT_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-            AWS_ECR_REPO=ai-cloudsolutions
+            AWS_ECR_REPO="ai-cloudsolutions"
+            aws ecr describe-repositories --region "${AWS_REGION}" --repository-names "${AWS_ECR_REPO}" >/dev/null 2>&1 || \
+              aws ecr create-repository --region "${AWS_REGION}" --repository-name "${AWS_ECR_REPO}"
             dockerpath=$(cat /tmp/docker_tag.out)
             docker tag "${dockerpath}:latest" "${AWS_ECR_ACCOUNT_URL}/${AWS_ECR_REPO}:flask-app-prediction"
             docker image ls
