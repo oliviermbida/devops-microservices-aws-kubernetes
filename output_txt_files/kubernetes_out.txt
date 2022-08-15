@@ -1,1 +1,6 @@
-<paste log output from Kubernetes-mediated prediction, here>
+NAME                                    READY   STATUS    RESTARTS   AGE   LABELS
+flask-app-prediction-64674b7496-8gqm6   1/1     Running   0          37s   app.kubernetes.io/component=backend,app.kubernetes.io/name=flask-app-prediction,pod-template-hash=64674b7496
+---Forwarding local port---
+Forwarding from 127.0.0.1:8000 -> 80
+Forwarding from [::1]:8000 -> 80
+Handling connection for 8000

@@ -44,6 +44,18 @@ kubectl get service
 # Step 4:
 # Forward the container port to a host
 #kubectl port-forward minikube-flask-app-prediction  8000:80
+
+while [ 1 ]   # Endless loop.
+do
+    podstaus=$(kubectl get pods  -o json | jq -r ".items[].status.phase")
+    echo "Pod Status: $podstaus"
+    if [[ $podstaus == "Running"  ]]; then
+        echo "Exiting pod status: $podstaus"
+        break;
+    fi
+    sleep 5
+done
+kubectl get pods --show-labels 
 echo "---Forwarding local port---"
 kubectl port-forward service/flask-app-prediction 8000:80
 
