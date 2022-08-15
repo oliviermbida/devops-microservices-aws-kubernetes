@@ -7,7 +7,7 @@
 docker build -t flask-app-prediction .
 # Step 2: 
 # List docker images
-docker images ls
+docker image ls
 # Step 3: 
 # Run flask app
-docker run -p 8000:80 -it flask-app-prediction
+docker run -v $(pwd):/repo -p 8000:80 -it flask-app-prediction

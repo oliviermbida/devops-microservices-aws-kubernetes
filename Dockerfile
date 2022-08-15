@@ -15,4 +15,5 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 EXPOSE 80
 ## Step 5:
 # Run app.py at container launch
-CMD ["python", "app.py"]
+# CMD ["/bin/sh", "-c", "python app.py"]
+CMD ["/bin/sh", "-c", "python app.py >> ./output_txt_files/app.log 2>&1"]
